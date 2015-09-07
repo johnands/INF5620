@@ -112,8 +112,8 @@ def demo(beta, Theta):
 
 
 # === main ===
-#test_func1()
-#test_func2()
+test_func1()
+test_func2()
 demo(0.9, 20)
 
 
