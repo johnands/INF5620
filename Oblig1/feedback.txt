@@ -1,0 +1,17 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Sep  7 15:42:31 2015
+
+@author: Vigdis, Christian Pedersen, Giovanni Pederiva, Hao Zhao
+"""
+
+vib_undamped_verify_mms:
+
+Passed:
+Needs some more comments. The Absolute value of error between numerical and 
+exact solution does not look right, this should be zero? 
+
+elastic_pendulum:
+
+Passed:
+Everything looks good. Nice plots :-)
