@@ -1,0 +1,12 @@
+Kjører ikke:
+./2dwave_project.py 
+Traceback (most recent call last):
+  File "./2dwave_project.py", line 895, in <module>
+    standing_undamped_waves(version='vectorized', animate=False)
+  File "./2dwave_project.py", line 761, in standing_undamped_waves
+    user_action=None, version=version)
+  File "./2dwave_project.py", line 68, in solver
+    c = np.zeros((Nx+1,Ny+1)) + c
+NameError: global name 'np' is not defined
+
+
