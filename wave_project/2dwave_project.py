@@ -342,7 +342,7 @@ def solver(I, V, f, c, Lx, Ly, Nx, Ny, dt, T, b,
     # Important to set u = u_1 if u is to be returned!
     t1 = time.clock()
     # dt might be computed in this function so return the value
-    return u, x, y, t, t1 - t0
+    return u, x, y, t,t1 - t0
 
 
 
@@ -627,10 +627,9 @@ def test_constant_solution(version='scalar', animate=False):
         assert abs((u-u_exact)).max() < tol
 
     if animate:
-        cpu = visualize(I, 0, 0, c, Lx, Ly, Nx, Ny, dt, T, b, version=version)
-        print cpu   
+        cpu = visualize(I, 0, 0, c, Lx, Ly, Nx, Ny, dt, T, b, version=version) 
     else:
-        u, dt, cpu = solver(I, 0, 0, c, Lx, Ly, Nx, Ny, dt, T, b,
+        u, x, y, t, cpu = solver(I, 0, 0, c, Lx, Ly, Nx, Ny, dt, T, b,
                             user_action=assert_no_error, version=version)
 
 
@@ -715,7 +714,7 @@ def pulse(C=1,            # aximum Courant number
                         version=version,
                         safety_factor=1., C=1.)
     else:
-        u, dt, cpu =  solver(I=I, V=None, f=None, c=c, Lx=L, Ly=L, Nx=N, Ny=N,
+        u, x, y, t, cpu =  solver(I=I, V=None, f=None, c=c, Lx=L, Ly=L, Nx=N, Ny=N,
                              dt=dt, T=T, b=0.,
                              user_action=printfunc, version=version,
                              safety_factor=1., C=1.)
@@ -734,47 +733,46 @@ def standing_undamped_waves(version='scalar', animate=False):
     I = lambda x, y: A*cos(kx*x)*cos(ky*y)
 
     c = 1.0
-    Nx = 20.0; Ny = 20.0
-    T = 3.0
-    
-    #global e_max
-    #e_max = 0
+    T = 2.0
 
     def error(u, x, xv, y, yv, t, n):
-        e = abs(u_exact(x, y, t[n]) - u)
-        global e_max
-        e_max = max(e_max, e.max())  
+        u_exact_n = u_exact(xv, yv, t[n])
+        # store error squared at time tn for the whole mesh
+        e = sum((u_exact_n - u)**2)
+        outfile.write('%f' % e + '\n')
 
     if animate:
         dt = 0.1
+        Nx = 20.0; Ny = 20.0
         cpu = visualize(I=I, V=None, f=None, c=c, Lx=Lx, Ly=Ly, Nx=Nx, Ny=Ny,
                         dt=dt, T=T, b=0.,
                         version=version,
-                        safety_factor=1., C=1.)     
+                        safety_factor=1., C=1., u_exact=u_exact)     
 
     else:
-        dt_values = [0.1*2**(-i) for i in range(6)]
+        h_values = [0.1*2**(-i) for i in range(6)]
         E_values = []
-        for dt in dt_values:
+        for h in h_values:
+            dt = h
+            dx = 10*h; dy = 10*h
+            Nx = Lx/dx; Ny = Ly/dy
             u, x, y, t, cpu = solver(I=I, V=None, f=None, c=c, Lx=Lx, Ly=Ly, Nx=Nx, Ny=Ny,
                                      dt=dt, T=T, b=0.,
                                      user_action=None, version=version)
             e = sum((u_exact(x, y, t[-1]) - u)**2)
-            dx = x[1]-x[0]; dy = y[1]-y[0]; dt = t[1]-t[0]
-            e = sqrt(dx*dy*dt*e)
-            E_values.append(e)
+            E = sqrt(dx*dy*dt*e)
+            E_values.append(E)
 
         print E_values
-        print dt_values
-        r = compute_rates(dt_values, E_values)
+        r = compute_rates(h_values, E_values)
         print 'r: %s' % r
             
             
-def compute_rates(dt_values, E_values):
+def compute_rates(h_values, E_values):
     """compute convergence rates"""
-    m = len(dt_values)
-    r = [np.log(E_values[i-1]/E_values[i])/
-         np.log(dt_values[i-1]/dt_values[i])
+    m = len(h_values)
+    r = [log(E_values[i-1]/E_values[i])/
+         log(h_values[i-1]/h_values[i])
          for i in range(0, m, 1)]
     # Round to two decimals
     r = [round(r_, 2) for r_ in r]
@@ -815,14 +813,14 @@ def visualize(I, V, f, c, Lx, Ly, Nx, Ny, dt, T, b,
         fig = plt.figure(figsize=plt.figaspect(0.5))
     else:
         fig = plt.figure()
+        ax = axes3d.Axes3D(fig)
+        global wframe
+        wframe = None
 
-    ax = axes3d.Axes3D(fig)
 
-    global wframe
-    wframe = None
 
     def plot_u(u, x, xv, y, yv, t, n):
-        X, Y = meshgrid(x,y)       
+        X, Y = meshgrid(x, y)       
       
         #ax.set_zlim3d(-10, 10)
         global wframe
@@ -839,25 +837,60 @@ def visualize(I, V, f, c, Lx, Ly, Nx, Ny, dt, T, b,
             ax.collections.remove(oldcol)
 
         plt.draw()
-        time.sleep(0.02)
+        time.sleep(0.05)
    
     # plot u and u_exact 
-    """
+    
     def plot_u_exact(u, x, xv, y, yv, t, n):
-    """
-              
+        ax = fig.add_subplot(1, 2, 1, projection='3d')
+        X, Y = meshgrid(x, y)
 
-    u, dt, cpu = solver(I=I, V=V, f=f, c=c, Lx=Lx, Ly=Ly, Nx=Nx, Ny=Ny,
-                        dt=dt, T=T, b=b,
-                        user_action=plot_u, version=version,
-                        safety_factor=safety_factor, C=C)
+        wframe1 = ax.plot_wireframe(X, Y, u)
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        ax.set_zlabel('u')
+        ax.set_zlim3d(-1, 1)
+        ax.set_title('u_exact, t=%.1f' % t[n])
+
+        ax = fig.add_subplot(1, 2, 2, projection='3d')
+        X, Y = meshgrid(x, y)
+
+        wframe2 = ax.plot_wireframe(X, Y, u)
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        ax.set_zlabel('u')
+        ax.set_zlim3d(-1, 1)
+        ax.set_title('u_exact, t=%.1f' % t[n])
+
+        plt.draw()
+        time.sleep(0.02)
+        
+              
+    if u_exact:
+        u, x, y, t, cpu = solver(I=I, V=V, f=f, c=c, Lx=Lx, Ly=Ly, Nx=Nx, Ny=Ny,
+                                 dt=dt, T=T, b=b,
+                                 user_action=plot_u_exact, version=version,
+                                 safety_factor=safety_factor, C=C)
+    else:
+        u, x, y, t, cpu = solver(I=I, V=V, f=f, c=c, Lx=Lx, Ly=Ly, Nx=Nx, Ny=Ny,
+                                 dt=dt, T=T, b=b,
+                                 user_action=plot_u, version=version,
+                                 safety_factor=safety_factor, C=C)        
     return cpu 
 
 
     
 
 if __name__ == '__main__':
+    # gaussian - not part of project
     #gaussian(version='vectorized')
-    #test_constant_solution(version='scalar')
-    #pulse(version='scalar', animate=True, T=5., pulse_tp='plugy')
+    
+    # test constant solution: py.test 2dwave_project.py for pytest
+    #test_constant_solution(version='scalar', animate=True)
+
+    # test plug-wave: 'plugx' for x-direction, 'plugy' for y-direction
+    #pulse(version='scalar', animate=True, T=5., pulse_tp='plugx')
+    
+    # animate=False to compute convergence rates
     standing_undamped_waves(version='vectorized', animate=False)
+
