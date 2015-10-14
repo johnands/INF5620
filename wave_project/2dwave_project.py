@@ -25,11 +25,12 @@ This function allows the calling code to plot the solution,
 compute errors, etc.
 """
 import time, sys
-from scitools.std import *
+#from scitools.std import *
+from numpy import *
 
 def solver(I, V, f, c, Lx, Ly, Nx, Ny, dt, T, b,
            user_action=None, version='scalar',
-           safety_factor=1.0, C=1.0):
+           safety_factor=1.0, C=1.0, dim=1):
 
     if version == 'scalar':
         advance = advance_scalar
@@ -51,8 +52,11 @@ def solver(I, V, f, c, Lx, Ly, Nx, Ny, dt, T, b,
     elif callable(c):
         c_max = (c(xv,yv)).max()
 
-    stability_limit = (dx*safety_factor*C)/c_max
-    #stability_limit = (dx*safety_factor)/c_max
+    if dim == 2:
+        stability_limit = (1./c_max)*(1./(sqrt((1./dx**2) + (1./dy**2))))
+        print stability_limit
+    else:
+        stability_limit = (dx*safety_factor*C)/c_max
     
     if dt <= 0:                # max time step?
         safety_factor = -dt    # use negative dt as safety factor
@@ -61,14 +65,14 @@ def solver(I, V, f, c, Lx, Ly, Nx, Ny, dt, T, b,
         print 'error: dt=%g exceeds the stability limit %g' % \
               (dt, stability_limit)
     Nt = int(round(T/float(dt)))
-    t = linspace(0, Nt*dt, Nt+1)    # mesh points in time
+    t = linspace(0, T, Nt+1)    # mesh points in time
 
     # Treat c(x) as array
     if isinstance(c, (float,int)):
-        c = np.zeros((Nx+1,Ny+1)) + c
+        c = zeros((Nx+1,Ny+1)) + c
     elif callable(c):
         # Call c(x) and fill array c
-        c_ = np.zeros((Nx+1,Ny+1))
+        c_ = zeros((Nx+1,Ny+1))
         c_[:,:] = c(xv, yv)
         c = c_
   
@@ -342,7 +346,7 @@ def solver(I, V, f, c, Lx, Ly, Nx, Ny, dt, T, b,
     # Important to set u = u_1 if u is to be returned!
     t1 = time.clock()
     # dt might be computed in this function so return the value
-    return u, x, y, t,t1 - t0
+    return u, x, xv, y, yv, t, t1 - t0
 
 
 
@@ -463,7 +467,6 @@ def advance_scalar(u, u_1, u_2, f, x, y, t, n, Cx2, Cy2, dt2, D, q):
     u[i,j] = (1./(1+D))*(2*u_1[i,j] + u_2[i,j]*(D-1) +  \
              Cx2*dqdx + Cy2*dqdy + dt2*f(x[i], y[j], t[n])) 
  
-
     return u      
 
 
@@ -584,10 +587,115 @@ def advance_vectorized(u, u_1, u_2, f_a, Cx2, Cy2, dt2, D, q):
     return u
 
 
+def visualize(I, V, f, c, Lx, Ly, Nx, Ny, dt, T, b, 
+              version, safety_factor=1., C=1.,
+              u_exact=None, B=None):
+
+    from mpl_toolkits.mplot3d import axes3d
+    import matplotlib.pyplot as plt
+    import time
+
+    plt.ion()
+
+    if u_exact is not None or B is not None:
+        #fig = plt.figure(figsize=plt.figaspect(0.5))
+        fig = plt.figure()
+    else:
+        fig = plt.figure()
+        ax = axes3d.Axes3D(fig)
+        global wframe
+        wframe = None
+
+
+
+    def plot_u(u, x, xv, y, yv, t, n):
+        X, Y = meshgrid(x, y)       
+      
+        #ax.set_zlim3d(-10, 10)
+        global wframe
+        oldcol = wframe   
+        
+        wframe = ax.plot_wireframe(X, Y, u)
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        ax.set_zlabel('u')
+        ax.set_title('u, t=%.1f' % t[n])
+
+
+        # Remove old line collection before drawing
+        if oldcol is not None:
+            ax.collections.remove(oldcol)
+
+        plt.draw()
+        #time.sleep(0.01)
+   
+    # plot u and u_exact 
+    
+    def plot_u_exact(u, x, xv, y, yv, t, n):
+        ax = fig.add_subplot(1, 2, 1, projection='3d')
+        X, Y = meshgrid(x, y)
+
+        wframe1 = ax.plot_wireframe(X, Y, u)
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        ax.set_zlabel('u')
+        ax.set_zlim3d(-1, 1)
+        ax.set_title('u, t=%.1f' % t[n])
+
+        ax = fig.add_subplot(1, 2, 2, projection='3d')
+        X, Y = meshgrid(x, y)
+        u_e = u_exact(xv, yv, t[n])
+
+        wframe2 = ax.plot_wireframe(X, Y, u_e)
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        ax.set_zlabel('u')
+        ax.set_zlim3d(-1, 1)
+        ax.set_title('u_exact, t=%.1f' % t[n])
+
+        plt.draw()
+        #time.sleep(0.02)
+
+    def plot_bottom(u, x, xv, y, yv, t, n):
+        ax = fig.add_subplot(111, projection='3d')
+        X, Y = meshgrid(x, y)
+
+        ax.plot_wireframe(X, Y, u)
+
+        u_e = B(xv, yv)
+        ax.plot_wireframe(X, Y, u_e)
+
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        ax.set_zlabel('u')
+        ax.set_zlim3d(-0.2, 1.9)
+        ax.set_title('t=%.1f' % t[n])
+        plt.savefig('waveplot_%04d.png' % (n))
+        plt.draw()
+        
+              
+    if u_exact is not None:
+        u, x, xv, y, yv, t, cpu = solver(I=I, V=V, f=f, c=c, Lx=Lx, Ly=Ly, Nx=Nx, Ny=Ny,
+                                         dt=dt, T=T, b=b,
+                                         user_action=plot_u_exact, version=version,
+                                         safety_factor=safety_factor, C=C)
+    elif B is not None:
+        u, x, xv, y, yv, t, cpu = solver(I=I, V=V, f=f, c=c, Lx=Lx, Ly=Ly, Nx=Nx, Ny=Ny,
+                                         dt=dt, T=T, b=b,
+                                         user_action=plot_bottom, version=version,
+                                         safety_factor=safety_factor, C=C, dim=2)
+        
+    else:
+        u, x, xv, y, yv, t, cpu = solver(I=I, V=V, f=f, c=c, Lx=Lx, Ly=Ly, Nx=Nx, Ny=Ny,
+                                         dt=dt, T=T, b=b,
+                                         user_action=plot_u, version=version,
+                                         safety_factor=safety_factor, C=C)        
+    return cpu 
+
+
 def gaussian(version='vectorized'):
     """
     Initial Gaussian bell in the middle of the domain.
-    plot_method=1 applies mesh function, =2 means surf, =0 means no plot.
     """
     # Clean up plot files
     for name in glob('tmp_*.png'):
@@ -608,7 +716,8 @@ def gaussian(version='vectorized'):
     cpu = visualize(I, 0, 0, c, Lx, Ly, Nx, Ny, 0.1, T, 0., version=version)
 
 
-def test_constant_solution(version='scalar', animate=False):
+def test_constant_solution(version='vectorized', animate=False):
+    """Test that u stays constant if I(x,y) = c."""
     Lx = 10.
     Ly = 10.
     c = lambda x, y: cos(x)
@@ -629,98 +738,65 @@ def test_constant_solution(version='scalar', animate=False):
     if animate:
         cpu = visualize(I, 0, 0, c, Lx, Ly, Nx, Ny, dt, T, b, version=version) 
     else:
-        u, x, y, t, cpu = solver(I, 0, 0, c, Lx, Ly, Nx, Ny, dt, T, b,
-                            user_action=assert_no_error, version=version)
+        u, x, xv, y, yv, t, cpu = solver(I, 0, 0, c, Lx, Ly, Nx, Ny, dt, T, b,
+                                         user_action=assert_no_error, version=version)
 
 
 
-def pulse(C=1,            # aximum Courant number
-          N=20,         # spatial resolution
-          version='vectorized',
-          T=1,            # end time
-          loc='center',     # location of initial condition
-          pulse_tp='plugx',  # pulse/init.cond. type
-          slowness_factor=2, # wave vel. in right medium
-          medium=[0.7, 0.9], # interval for right medium
-          skip_frame=1,      # skip frames in animations
-          sigma=0.05,        # width measure of the pulse
-          animate=False
-          ):
+def test_plug(C=1,                   # aximum Courant number
+              N=20,                  # spatial resolution
+              version='vectorized',  # scheme version
+              T=1,                   # end time
+              loc='center',          # location of initial condition
+              pulse_tp='plugx',      # pulse/init.cond. type
+              sigma=0.05,            # width measure of the pulse
+              animate=False
+              ):
     """
-    Various peaked-shaped initial conditions on [0,1].
-    Wave velocity is decreased by the slowness_factor inside
-    medium. The loc parameter can be 'center' or 'left',
+    Check that plug wave splits in two and meet back at the same place.
+    The loc parameter can be 'center' or 'left',
     depending on where the initial pulse is to be located.
     The sigma parameter governs the width of the pulse.
     """
     # Use scaled parameters: L=1 for domain length, c_0=1
     # for wave velocity outside the domain.
-    L = 1.0
-    c_0 = 1.0
+    L = 10.0
+    c = 0.5
 
     if loc == 'center':
         xc = L/2
     elif loc == 'left':
         xc = 0
 
-    if pulse_tp in ('gaussian','Gaussian'):
-        def I(x):
-            return exp(-0.5*((x-xc)/sigma)**2)
-
-    elif pulse_tp == 'plugx':
+    if pulse_tp == 'plugx':
         def I(x, y):
             return 0 if abs(x-xc) > sigma else 1
 
     elif pulse_tp == 'plugy':
         def I(x, y):
             return 0 if abs(y-xc) > sigma else 1
-
-    elif pulse_tp == 'cosinehat':
-        def I(x):
-            # One period of a cosine
-            w = 2
-            a = w*sigma
-            return 0.5*(1 + cos(pi*(x-xc)/a)) \
-                   if xc - a <= x <= xc + a else 0
-
-    elif pulse_tp == 'half-cosinehat':
-        def I(x):
-            # Half a period of a cosine
-            w = 4
-            a = w*sigma
-            return cos(pi*(x-xc)/a) \
-                   if xc - 0.5*a <= x <= xc + 0.5*a else 0
     else:
         raise ValueError('Wrong pulse_tp="%s"' % pulse_tp)
 
-    c = c_0 
-    """
-    def c(x, y):
-        return c_0/slowness_factor \
-               if medium[0] <= x.any() <= medium[1] else c_0
-    """
-
-    def printfunc(u, x, xv, y, yv, t, n):
-        print u[0,:]
-        print
-
-    dt = 0.05 # choose the stability limit with given Nx, worst case c
+    dt = -1		# unit Courant number
     
-    
-
     if animate: 
         cpu = visualize(I=I, V=None, f=None, c=c, Lx=L, Ly=L, Nx=N, Ny=N,
                         dt=dt, T=T, b=0.,
                         version=version,
                         safety_factor=1., C=1.)
     else:
-        u, x, y, t, cpu =  solver(I=I, V=None, f=None, c=c, Lx=L, Ly=L, Nx=N, Ny=N,
-                             dt=dt, T=T, b=0.,
-                             user_action=printfunc, version=version,
-                             safety_factor=1., C=1.)
+        u, x, xv, y, yv, t, cpu =  solver(I=I, V=None, f=None, c=c, Lx=L, Ly=L, Nx=N, Ny=N,
+                                          dt=dt, T=2.0, b=0.,
+                                          user_action=None, version=version,
+                                          safety_factor=1., C=1.)
+        u_exact = array([[I(x_, y_) for y_ in y] for x_ in x])
+        tol = 1E-14
+        diff = abs(u_exact - u).max()
+        assert diff < tol
 
 
-def standing_undamped_waves(version='scalar', animate=False):
+def standing_undamped_waves(version='vectorized', animate=False):
 
     mx = 3.0
     my = 3.0
@@ -728,12 +804,12 @@ def standing_undamped_waves(version='scalar', animate=False):
     kx = (mx*pi)/Lx
     ky = (my*pi)/Ly
     A = 1.0
-    w = pi
+    c = 2.0
+    w = c*sqrt(kx**2 + ky**2)
     u_exact = lambda x, y, t: A*cos(kx*x)*cos(ky*y)*cos(w*t)
     I = lambda x, y: A*cos(kx*x)*cos(ky*y)
 
-    c = 1.0
-    T = 2.0
+    T = 1.0
 
     def error(u, x, xv, y, yv, t, n):
         u_exact_n = u_exact(xv, yv, t[n])
@@ -753,13 +829,14 @@ def standing_undamped_waves(version='scalar', animate=False):
         h_values = [0.1*2**(-i) for i in range(6)]
         E_values = []
         for h in h_values:
-            dt = h
-            dx = 10*h; dy = 10*h
-            Nx = Lx/dx; Ny = Ly/dy
-            u, x, y, t, cpu = solver(I=I, V=None, f=None, c=c, Lx=Lx, Ly=Ly, Nx=Nx, Ny=Ny,
-                                     dt=dt, T=T, b=0.,
-                                     user_action=None, version=version)
-            e = sum((u_exact(x, y, t[-1]) - u)**2)
+            dt = h/2.
+            Nx = 1.0/h; Ny = 1.0/h
+            u, x, xv, y, yv, t, cpu = solver(I=I, V=None, f=None, c=c, Lx=Lx, Ly=Ly, Nx=Nx, Ny=Ny,
+                                                 dt=dt, T=T, b=0.,
+                                                 user_action=None, version=version)
+            dx = x[1]; dy = y[1]
+            u_e = u_exact(xv, yv, t[-1])
+            e = sum((u_e - u)**2)
             E = sqrt(dx*dy*dt*e)
             E_values.append(E)
 
@@ -777,111 +854,115 @@ def compute_rates(h_values, E_values):
     # Round to two decimals
     r = [round(r_, 2) for r_ in r]
     return r
-            
 
 
+def manufactured_solution(version='vectorized', animate=False):
+    mx = 3.0
+    my = 3.0
+    Lx = 10.0; Ly = 10.0
+    kx = (mx*pi)/Lx
+    ky = (my*pi)/Ly
+    A = 1.0; B = 1.0
+    c = 1.0
+    w = c*sqrt(kx**2 + ky**2 - 1)
+    b = 2.0
 
-"""
-def source_term(L):
-    
-    Adapt source term to exact solution u_exact using sympy
-    
-    un, xn, yn, tn, fn, w, qn, Ln = sym.symbols('un xn tn fn w qn Ln')
-    #qn = 1 + (xn-(Ln/2))**4		# a)
-    qn = 1 + sym.cos(sym.pi*xn/Ln)	# b)
-    w = 1
-    un = sym.cos(sym.pi*xn/Ln)*sym.cos(w*tn)
-    fn = un.diff(tn, 2) - (qn*un.diff(xn)).diff(xn)
-    # convert to callable python lambda function
-    f = sym.lambdify((xn, yn, tn), sym.simplify(fn.subs(Ln,L)))
-    return f
-"""
+    T = 5.0
 
+    import sympy as sym
 
-def visualize(I, V, f, c, Lx, Ly, Nx, Ny, dt, T, b, 
-              version, safety_factor=1., C=1.,
-              u_exact=None):
+    u_exact = lambda x, y, t: (A*cos(w*t) + B*sin(w*t))*exp(-c*t)*cos(kx*x)*cos(ky*y)
+    I = lambda x, y: A*cos(kx*x)*cos(ky*y)
 
-    from mpl_toolkits.mplot3d import axes3d
-    import matplotlib.pyplot as plt
-    import numpy as np
-    import time
+    def source_term(bv, kxv, kyv, Av, Bv, wv):
+        x, y, t, q, b, kx, ky, A, B, w, fsym, Vsym = sym.symbols('x y t q b kx ky A B w fsym Vsym')
+        q = 1.0
+        u = (A*sym.cos(w*t)+B*sym.sin(w*t))*sym.exp(-sym.sqrt(q)*t)*sym.cos(kx*x)*sym.cos(ky*y)
+        fsym = u.diff(t, 2) + b*u.diff(t, 1) - (q*u.diff(x)).diff(x) - (q*u.diff(y)).diff(y)
+        fsym = sym.simplify(fsym)
+        Vsym = u.diff(t)
+        f = sym.lambdify((x, y, t), fsym.subs([(b,bv),(kx,kxv),(ky,kyv),(A,Av),(B,Bv),(w,wv)]), 'numpy')
+        V = sym.lambdify((x, y), Vsym.subs([(b,bv),(kx,kxv),(ky,kyv),(A,Av),(B,Bv),(w,wv),(t,0)]), 'numpy')
+        return f, V
 
-    plt.ion()
+    f, V = source_term(b, kx, ky, A, B, w)
 
-    if u_exact:
-        fig = plt.figure(figsize=plt.figaspect(0.5))
+    if animate:
+        Nx = 10; Ny = 10
+        dt = 0.1
+        cpu = visualize(I=I, V=V, f=f, c=c, Lx=Lx, Ly=Ly, Nx=Nx, Ny=Ny,
+                        dt=dt, T=T, b=b,
+                        version=version,
+                        safety_factor=1., C=1., u_exact=u_exact)   
+
     else:
-        fig = plt.figure()
-        ax = axes3d.Axes3D(fig)
-        global wframe
-        wframe = None
+        h_values = [0.1*2**(-i) for i in range(6)]
+        E_values = []
+        for h in h_values:
+            dt = h
+            Nx = 1.0/h; Ny = 1.0/h
+            u, x, xv, y, yv, t, cpu = solver(I=I, V=V, f=f, c=c, Lx=Lx, Ly=Ly, Nx=Nx, Ny=Ny,
+                                                 dt=dt, T=T, b=0.,
+                                                 user_action=None, version=version)
+            dx = x[1]; dy = y[1]
+            u_e = u_exact(xv, yv, t[-1])
+            e = sum((u_e - u)**2)
+            E = sqrt(dx*dy*dt*e)
+            E_values.append(E)
+
+        print E_values
+        r = compute_rates(h_values, E_values)
+        print 'r: %s' % r
 
 
+def physical_problem(version='vectorized', bottom='Gaussian'):
 
-    def plot_u(u, x, xv, y, yv, t, n):
-        X, Y = meshgrid(x, y)       
-      
-        #ax.set_zlim3d(-10, 10)
-        global wframe
-        oldcol = wframe   
-        
-        wframe = ax.plot_wireframe(X, Y, u)
-        ax.set_xlabel('x')
-        ax.set_ylabel('y')
-        ax.set_zlabel('u')
+    T = 5.0   
+    Lx = 5.0; Ly = 5.0
+    g = 9.81
+    b = 0.0
 
+    f = 0
+    V = 0
 
-        # Remove old line collection before drawing
-        if oldcol is not None:
-            ax.collections.remove(oldcol)
+    Nx = 20.0; Ny = 20.0
+    dt = -0.9
 
-        plt.draw()
-        time.sleep(0.05)
-   
-    # plot u and u_exact 
+    if bottom == 'Gaussian':
+        I_0 = 1.2; I_a = 0.5 ; I_m = 0; I_s = 0.1
+        B_0 = 0.0; B_a = 0.7; B_mx = Lx/2.0 ; B_my = Ly/2.0 ; B_s = 0.3 ; b_scale = 1
+        I = lambda x, y: I_0 + I_a*exp(-((x-I_m)/I_s)**2)
+        B = lambda x, y: B_0 + B_a*exp(-((x-B_mx)/B_s)**2 - ((y-B_my)/(b_scale*B_s))**2)
     
-    def plot_u_exact(u, x, xv, y, yv, t, n):
-        ax = fig.add_subplot(1, 2, 1, projection='3d')
-        X, Y = meshgrid(x, y)
+    elif bottom == 'cosine_hat':
+        I_0 = 1.3; I_a = 0.5 ; I_m = Lx ; I_s = 0.5
+        B_0 = 0; B_a = 1.1; B_mx = Lx/2.0  ; B_my = Lx/2.0 ; B_s = 0.5
+        I = lambda x, y: I_0 + I_a*exp(-((x-I_m)/I_s)**2)
+        B = vectorize(lambda x, y: B_0 + B_a*cos(pi*(x-B_mx)/(2*B_s))*cos(pi*(y-B_my)/(2*B_s)) \
+                         if 0 <= sqrt((x-Lx/2.0)**2+(y-Ly/2.0)**2) <= B_s else B_0)
 
-        wframe1 = ax.plot_wireframe(X, Y, u)
-        ax.set_xlabel('x')
-        ax.set_ylabel('y')
-        ax.set_zlabel('u')
-        ax.set_zlim3d(-1, 1)
-        ax.set_title('u_exact, t=%.1f' % t[n])
+    elif bottom == 'box':
+        I_0 = 1.3; I_a = 0.5 ; I_m = Lx ; I_s = 0.5
+        B_0 = 0; B_a = 1.4; B_mx =Lx/2.0  ; B_my = Lx/2.0 ; B_s = 0.3; b_scale = 1.
+        I = lambda x, y: I_0 + I_a*exp(-((x-I_m)/I_s)**2)
+        B = vectorize(lambda x, y: B_0 + B_a \
+                         if B_mx - B_s <= x <= B_mx + B_s and B_my-b_scale*B_s <=y<= B_my+b_scale*B_s else B_0)
 
-        ax = fig.add_subplot(1, 2, 2, projection='3d')
-        X, Y = meshgrid(x, y)
-
-        wframe2 = ax.plot_wireframe(X, Y, u)
-        ax.set_xlabel('x')
-        ax.set_ylabel('y')
-        ax.set_zlabel('u')
-        ax.set_zlim3d(-1, 1)
-        ax.set_title('u_exact, t=%.1f' % t[n])
-
-        plt.draw()
-        time.sleep(0.02)
-        
-              
-    if u_exact:
-        u, x, y, t, cpu = solver(I=I, V=V, f=f, c=c, Lx=Lx, Ly=Ly, Nx=Nx, Ny=Ny,
-                                 dt=dt, T=T, b=b,
-                                 user_action=plot_u_exact, version=version,
-                                 safety_factor=safety_factor, C=C)
     else:
-        u, x, y, t, cpu = solver(I=I, V=V, f=f, c=c, Lx=Lx, Ly=Ly, Nx=Nx, Ny=Ny,
-                                 dt=dt, T=T, b=b,
-                                 user_action=plot_u, version=version,
-                                 safety_factor=safety_factor, C=C)        
-    return cpu 
+        raise ValueError('Wrong pulse_tp="%s"' % pulse_tp)
+
+    c = lambda x,y:  sqrt(9.81*(I(x,y)-B(x,y)))   
+
+    cpu = visualize(I=I, V=V, f=f, c=c, Lx=Lx, Ly=Ly, Nx=Nx, Ny=Ny,
+                    dt=dt, T=T, b=b,
+                    version=version,
+                    safety_factor=1., C=1., u_exact=None, B=B)    
 
 
     
 
 if __name__ == '__main__':
+    pass
     # gaussian - not part of project
     #gaussian(version='vectorized')
     
@@ -889,8 +970,18 @@ if __name__ == '__main__':
     #test_constant_solution(version='scalar', animate=True)
 
     # test plug-wave: 'plugx' for x-direction, 'plugy' for y-direction
-    #pulse(version='scalar', animate=True, T=5., pulse_tp='plugx')
+    #test_plug(version='scalar', animate=False, pulse_tp='plugx')
     
     # animate=False to compute convergence rates
-    standing_undamped_waves(version='vectorized', animate=False)
+    #standing_undamped_waves(version='vectorized', animate=False)
+
+    # animate=False to compute convergence rates
+    #manufactured_solution(version='vectorized', animate=False)
+
+    physical_problem(bottom='Gaussian')
+    
+    #movie('waveplot_*.png', encoder='convert', fps=25, output_file='animation.gif')	# Make a gif
+
+
+    
 
