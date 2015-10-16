@@ -695,8 +695,8 @@ def visualize(I, V, f, c, Lx, Ly, Nx, Ny, dt, T, b,
         ax.set_zlabel('u')
         ax.set_zlim3d(-0.2, 1.9)
         ax.set_title('t=%.1f' % t[n])
-        plt.savefig('waveplot_%04d.png' % (n))
-        #plt.draw()
+        #plt.savefig('waveplot_%04d.png' % (n))
+        plt.draw()
         
               
     if u_exact is not None:
@@ -732,10 +732,10 @@ def gaussian(version='vectorized'):
         """Gaussian peak at (Lx/2, Ly/2)."""
         return exp(-0.5*(x-Lx/2.0)**2 - 0.5*(y-Ly/2.0)**2)
 
-    Nx = 30; Ny = 30; T = 30
+    Nx = 60; Ny = 60; T = 30
 
     
-    cpu = visualize(I, 0, 0, c, Lx, Ly, Nx, Ny, 0.1, T, 0., version=version)
+    cpu = visualize(I, 0, 0, c, Lx, Ly, Nx, Ny, 0.01, T, 0., version=version)
 
 
 def test_constant_solution(version='vectorized', animate=False):
@@ -948,8 +948,8 @@ def physical_problem(version='vectorized', bottom='Gaussian'):
     f = 0
     V = 0
 
-    Nx = 80.0; Ny = 80.0
-    dt = -0.9
+    Nx = 70.0; Ny = 70.0
+    dt = -0.95
 
     if bottom == 'Gaussian':
         I_0 = 1.1; I_a = 0.3 ; I_m = 0; I_s = 0.1
@@ -991,7 +991,7 @@ def physical_problem(version='vectorized', bottom='Gaussian'):
 if __name__ == '__main__':
 
     # gaussian - not part of project
-    #gaussian(version='vectorized')
+    gaussian(version='vectorized')
     
     # test constant solution: py.test 2dwave_project.py for pytest
     #test_constant_solution(version='scalar', animate=True)
@@ -1006,15 +1006,17 @@ if __name__ == '__main__':
     #manufactured_solution(version='vectorized', animate=False)
 
     # investigate physical problem
-    #physical_problem(bottom='Gaussian')
+    #physical_problem(bottom='box')
+    #movie('waveplot_*.png', encoder='convert', fps=20, output_file='box.gif')    
 
     # make gifs
+    """
     bottoms = ['Gaussian', 'cosine_hat', 'box']
     for bottom in bottoms:      
         physical_problem(bottom=bottom)
         print bottom   
         movie('waveplot_*.png', encoder='convert', fps=25, output_file=bottom+'.gif')
-    
+    """
 
 
     
