@@ -1,0 +1,6 @@
+feedback on part a)
+-Assemble the element matrices A^e to the global matrix A
+-You can find the boundary function B(x) by using the boundary condition:
+u(0) = 0 and u(1) = 1 and the general form of u(x).
+YOu know that at x_0=0 all basis functions are zero escept phi0 and at x_n-1 = 0 all basis function are zero except phi_n-1.
+YOu can assume B(x)=ax+b. Then a and b will be expressed in terms of the coefficients c_0 and c_n-1.
