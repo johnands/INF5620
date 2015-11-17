@@ -1,3 +1,16 @@
+"""
+###############################################################
+
+Solving nonlinear diffusion equation using FEniCS.
+Uncomment function calls at bottom of script to 
+run different kinds of verifications and visualizations.
+
+###############################################################
+"""
+
+
+
+
 from dolfin import *
 import numpy as np
 
@@ -297,7 +310,7 @@ def gaussian():
 
 
 if __name__ == '__main__':
-    'd)'
+    'd) run py.test diffusion.py to test'
     #test_constant()
 
     'e)'
