@@ -235,8 +235,8 @@ def source_term(L):
     Adapt source term to exact solution u_exact using sympy
     """
     un, xn, tn, fn, w, qn, Ln = sym.symbols('un xn tn fn w qn Ln')
-    #qn = 1 + (xn-(Ln/2))**4
-    qn = 1 + sym.cos(sym.pi*xn/Ln)
+    #qn = 1 + (xn-(Ln/2))**4		# a)
+    qn = 1 + sym.cos(sym.pi*xn/Ln)	# b)
     w = 1
     un = sym.cos(sym.pi*xn/Ln)*sym.cos(w*tn)
     fn = un.diff(tn, 2) - (qn*un.diff(xn)).diff(xn)
@@ -248,8 +248,8 @@ def convergence_rates():
     """Constructing the simulation and computing convergence rates"""
 
     L = 1.					# mesh from x=0 to x=L						
-    c = lambda x: np.sqrt(1 + np.cos(np.pi*x/L))# wave speed
-    #c = lambda x: np.sqrt(1 + (x-L/2)**4)
+    c = lambda x: np.sqrt(1 + np.cos(np.pi*x/L))# wave speed b)
+    #c = lambda x: np.sqrt(1 + (x-L/2)**4)	# wave speed a)
     w = 1.					# angular frequency
     A = 1.				        # amplitude
     num_periods = 2.

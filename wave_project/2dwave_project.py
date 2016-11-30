@@ -732,10 +732,10 @@ def gaussian(version='vectorized'):
         """Gaussian peak at (Lx/2, Ly/2)."""
         return exp(-0.5*(x-Lx/2.0)**2 - 0.5*(y-Ly/2.0)**2)
 
-    Nx = 60; Ny = 60; T = 30
+    Nx = 30; Ny = 30; T = 30
 
     
-    cpu = visualize(I, 0, 0, c, Lx, Ly, Nx, Ny, 0.01, T, 0., version=version)
+    cpu = visualize(I, 0, 0, c, Lx, Ly, Nx, Ny, 0.05, T, 0., version=version)
 
 
 def test_constant_solution(version='vectorized', animate=False):

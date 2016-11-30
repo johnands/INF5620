@@ -43,7 +43,7 @@ def solver(I, V, f, c, L, dt, C, T,
     dx = float((dt*c_max)/C)  
 
     Nx = int(round(L/dx))
-    x = np.linspace(0, L, Nx+3)          # Mesh points in space using ghost cells
+    x = np.linspace(0, L, Nx+1)          # Mesh points in space using ghost cells
 
     # Treat c(x) as array
     if isinstance(c, (float,int)):
@@ -70,22 +70,23 @@ def solver(I, V, f, c, L, dt, C, T,
     u_1 = np.zeros(Nx+3)   # Solution at 1 time level back
     u_2 = np.zeros(Nx+3)   # Solution at 2 time levels back
 
+
     import time;  t0 = time.clock()  # CPU time measurement
 
     Ix = range(1, Nx+2)
     It = range(0, Nt+1)
 
     # Load initial condition into u_1
-    for i in range(0, Nx+1):
-        u_1[i] = I(x[i])
+    for i in Ix[1:-1]:
+        u_1[i] = I(x[i-Ix[0]])   
 
     if user_action is not None:
-        user_action(u_1[1:-1], x[1:-1], t, 0)
+        user_action(u_1[1:-1], x, t, 0)
 
     # Special formula for the first step
     for i in Ix[1:-1]:
         u[i] = u_1[i] + dt*V(i-Ix[0]) + \
-        0.25*C2*(0.5*(q[i] + q[i+1])*(u_1[i+1] - u_1[i]) - \
+        0.5*C2*(0.5*(q[i] + q[i+1])*(u_1[i+1] - u_1[i]) - \
                 0.5*(q[i] + q[i-1])*(u_1[i] - u_1[i-1])) + \
         0.5*dt2*f(i-Ix[0], t[0])
 
@@ -95,7 +96,7 @@ def solver(I, V, f, c, L, dt, C, T,
     u[i+1] = u[i-1]
 
     if user_action is not None:
-        user_action(u[1:-1], x[1:-1], t, 1)
+        user_action(u[1:-1], x, t, 1)
 
     # Update data structures for next step
     #u_2[:] = u_1;  u_1[:] = u  # safe, but slower
@@ -105,7 +106,7 @@ def solver(I, V, f, c, L, dt, C, T,
         # Update all inner points
         for i in Ix[1:-1]:
             u[i] = - u_2[i] + 2*u_1[i] + \
-                0.5*C2*(0.5*(q[i] + q[i+1])*(u_1[i+1] - u_1[i])  - \
+                C2*(0.5*(q[i] + q[i+1])*(u_1[i+1] - u_1[i])  - \
                     0.5*(q[i] + q[i-1])*(u_1[i] - u_1[i-1])) + \
                 dt2*f(i-Ix[0], t[n])
 
@@ -117,7 +118,7 @@ def solver(I, V, f, c, L, dt, C, T,
             u[i+1] = u[i-1]
 
         if user_action is not None:
-            if user_action(u[1:-1], x[1:-1], t, n+1):
+            if user_action(u[1:-1], x, t, n+1):
                 break
 
         # Update data structures for next step
@@ -129,7 +130,7 @@ def solver(I, V, f, c, L, dt, C, T,
     # remove ghost cells
     u = u_1
     cpu_time = t0 - time.clock()  
-    return u[1:-1], x[1:-1], t, cpu_time
+    return u[1:-1], x, t, cpu_time
 
 def viz(I, V, f, c, L, dt, C, T, umin, umax, u_exact, user):
     """Run solver and visualize u at each time level."""
